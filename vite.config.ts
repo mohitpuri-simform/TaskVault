@@ -30,6 +30,7 @@ export default defineConfig(({ mode }) => {
           display: "standalone",
           background_color: "#f3efe6",
           theme_color: "#20463f",
+          orientation: "portrait",
           shortcuts: [
             {
               name: "View Todos",

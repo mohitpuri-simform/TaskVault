@@ -6,10 +6,8 @@ import {
   useState,
   type FormEvent,
 } from "react";
-import useTodos, { TODOS_QUERY_KEY } from "./hooks/useTodos";
-import useTodoMutations from "./hooks/useTodoMutations";
-import useQueueSync from "./hooks/useQueueSync";
-import { useQueryClient } from "@tanstack/react-query";
+import { useTodoCrud } from "./hooks/useTodoCrud";
+import { useWebAuthn } from "./hooks/useWebAuthn";
 import { InstallPrompt } from "./components/InstallPrompt";
 import { WebcamPanel } from "./components/WebcamPanel";
 import { ProfileAvatar } from "./components/ProfileAvatar";
@@ -18,7 +16,8 @@ import { ProfilePage } from "./components/ProfilePage";
 import { TopBar } from "./components/TopBar";
 import { TodoPanel } from "./components/TodoPanel";
 import { useNetworkStatus } from "./hooks/useNetworkStatus";
-import type { Filter, Todo } from "./types";
+import type { Filter } from "./types";
+import { AuthenticationGate } from "./components/AuthenticationGate";
 
 const TodoStats = lazy(() =>
   import("./components/TodoStats").then((module) => ({
@@ -94,7 +93,21 @@ function App() {
   const [filter, setFilter] = useState<Filter>("all");
   const [activeFeatureId, setActiveFeatureId] = useState<string | null>(null);
   const [showProfile, setShowProfile] = useState(false);
-  const { online, networkQuality } = useNetworkStatus();
+  const [showAuthGate, setShowAuthGate] = useState(false);
+  const { networkQuality } = useNetworkStatus();
+  const { credentialId } = useWebAuthn();
+  const {
+    todos,
+    isLoading,
+    isError,
+    online,
+    syncing,
+    queueLength,
+    handleAddTodo: handleAddTodoFromHook,
+    handlePatchTodo,
+    handleDeleteTodo,
+    syncQueueNow,
+  } = useTodoCrud({ onNotification: showLocalNotification });
 
   function highlightFeature(item: { id: string; targetId: string }) {
     setActiveFeatureId(null);
@@ -103,6 +116,16 @@ function App() {
       const target = document.getElementById(item.targetId);
       target?.scrollIntoView({ behavior: "smooth", block: "center" });
     });
+  }
+
+  function handleOpenProfile() {
+    // If a credential is registered, show auth gate first
+    if (credentialId) {
+      setShowAuthGate(true);
+    } else {
+      // Otherwise open profile directly
+      setShowProfile(true);
+    }
   }
 
   useEffect(() => {
@@ -115,98 +138,14 @@ function App() {
     return () => window.clearTimeout(timeoutId);
   }, [activeFeatureId]);
 
-  // Data + mutations provided by hooks.
-  const queryClient = useQueryClient();
-  const { data: todos = [], isLoading, isError } = useTodos();
-  const { addMutation, updateMutation, deleteMutation } = useTodoMutations(
-    showLocalNotification,
-  );
-  const { queue, setQueue, enqueue, syncQueueNow, syncing } =
-    useQueueSync(online);
-
   useEffect(() => {
     if (online) void syncQueueNow();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [online]);
 
-  async function handleAddTodo(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const title = draft.trim();
-    if (!title) return;
+  function handleAddTodo(event: FormEvent<HTMLFormElement>) {
     setDraft("");
-
-    if (online) {
-      addMutation.mutate(title);
-      return;
-    }
-
-    // Offline: store optimistically in the query cache and queue for later.
-    const optimisticTodo: Todo = {
-      id: `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      title,
-      completed: false,
-      updatedAt: Date.now(),
-      synced: false,
-    };
-    queryClient.setQueryData<Todo[]>(TODOS_QUERY_KEY, (old = []) => [
-      optimisticTodo,
-      ...old,
-    ]);
-    enqueue({ type: "create", todo: optimisticTodo });
-    showLocalNotification(`Saved offline: ${title}`);
-  }
-
-  function handlePatchTodo(todo: Todo, changes: Partial<Todo>) {
-    const updated: Todo = {
-      ...todo,
-      ...changes,
-      updatedAt: Date.now(),
-      synced: online,
-    };
-
-    if (todo.id.startsWith("local-")) {
-      queryClient.setQueryData<Todo[]>(TODOS_QUERY_KEY, (old = []) =>
-        old.map((t) => (t.id === todo.id ? updated : t)),
-      );
-      setQueue((prev) =>
-        prev.map((a) =>
-          a.type === "create" && a.todo.id === todo.id
-            ? { ...a, todo: updated }
-            : a,
-        ),
-      );
-      return;
-    }
-
-    if (online) {
-      updateMutation.mutate(updated);
-    } else {
-      queryClient.setQueryData<Todo[]>(TODOS_QUERY_KEY, (old = []) =>
-        old.map((t) => (t.id === todo.id ? { ...updated, synced: false } : t)),
-      );
-      enqueue({ type: "update", todo: { ...updated, synced: false } });
-    }
-  }
-
-  function handleDeleteTodo(todo: Todo) {
-    if (todo.id.startsWith("local-")) {
-      queryClient.setQueryData<Todo[]>(TODOS_QUERY_KEY, (old = []) =>
-        old.filter((t) => t.id !== todo.id),
-      );
-      setQueue((prev) =>
-        prev.filter((a) => !(a.type === "create" && a.todo.id === todo.id)),
-      );
-      return;
-    }
-
-    if (online) {
-      deleteMutation.mutate(todo.id);
-    } else {
-      queryClient.setQueryData<Todo[]>(TODOS_QUERY_KEY, (old = []) =>
-        old.filter((t) => t.id !== todo.id),
-      );
-      enqueue({ type: "delete", id: todo.id });
-    }
+    handleAddTodoFromHook(event);
   }
 
   const filteredTodos = useMemo(() => {
@@ -230,9 +169,9 @@ function App() {
             online={online}
             networkQuality={networkQuality}
             syncing={syncing}
-            queueLength={queue.length}
+            queueLength={queueLength}
             onEnableNotifications={askNotificationPermission}
-            onOpenProfile={() => setShowProfile(true)}
+            onOpenProfile={handleOpenProfile}
           />
 
           <div
@@ -297,6 +236,15 @@ function App() {
           </div>
         </section>
       </main>
+      {showAuthGate && (
+        <AuthenticationGate
+          onAuthSuccess={() => {
+            setShowAuthGate(false);
+            setShowProfile(true);
+          }}
+          onCancel={() => setShowAuthGate(false)}
+        />
+      )}
       {showProfile && <ProfilePage onClose={() => setShowProfile(false)} />}
     </>
   );

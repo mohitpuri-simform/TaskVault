@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
+  PASSKEY_CREDENTIAL_CHANGE_EVENT,
   clearPasskeyCredentialId,
   loadPasskeyCredentialId,
   loadPasskeyLastAuthAt,
@@ -69,6 +70,29 @@ export function useWebAuthn(userEmail?: string, userName?: string) {
     () => loadPasskeyLastAuthAt(),
   );
   const [authState, setAuthState] = useState<AuthState>({ status: "idle" });
+
+  useEffect(() => {
+    function syncCredentialFromStorage() {
+      setCredentialId(loadPasskeyCredentialId());
+    }
+
+    function onStorage(event: StorageEvent) {
+      if (event.key === null || event.key === "pwa-passkey-credential-id") {
+        syncCredentialFromStorage();
+      }
+    }
+
+    window.addEventListener(PASSKEY_CREDENTIAL_CHANGE_EVENT, syncCredentialFromStorage);
+    window.addEventListener("storage", onStorage);
+
+    return () => {
+      window.removeEventListener(
+        PASSKEY_CREDENTIAL_CHANGE_EVENT,
+        syncCredentialFromStorage,
+      );
+      window.removeEventListener("storage", onStorage);
+    };
+  }, []);
 
   const webAuthnSupportReason = getWebAuthnSupportReason();
 

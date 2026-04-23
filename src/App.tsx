@@ -3,6 +3,7 @@ import {
   Suspense,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type FormEvent,
 } from "react";
@@ -89,11 +90,15 @@ const FEATURE_ITEMS = [
 ] as const;
 
 function App() {
+  const INACTIVITY_LOCK_MS = 60_000;
   const [draft, setDraft] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
   const [activeFeatureId, setActiveFeatureId] = useState<string | null>(null);
   const [showProfile, setShowProfile] = useState(false);
   const [showAuthGate, setShowAuthGate] = useState(false);
+  const [isAppLocked, setIsAppLocked] = useState(false);
+  const hiddenAtRef = useRef<number | null>(null);
+  const initializedLockRef = useRef(false);
   const { networkQuality } = useNetworkStatus();
   const { credentialId } = useWebAuthn();
   const {
@@ -119,6 +124,10 @@ function App() {
   }
 
   function handleOpenProfile() {
+    if (isAppLocked) {
+      return;
+    }
+
     // If a credential is registered, show auth gate first
     if (credentialId) {
       setShowAuthGate(true);
@@ -127,6 +136,50 @@ function App() {
       setShowProfile(true);
     }
   }
+
+  useEffect(() => {
+    if (!initializedLockRef.current) {
+      setIsAppLocked(Boolean(credentialId));
+      initializedLockRef.current = true;
+      return;
+    }
+
+    if (!credentialId) {
+      setIsAppLocked(false);
+      setShowAuthGate(false);
+      setShowProfile(false);
+    }
+  }, [credentialId]);
+
+  useEffect(() => {
+    if (!credentialId) {
+      hiddenAtRef.current = null;
+      return;
+    }
+
+    function handleVisibilityChange() {
+      if (document.hidden) {
+        hiddenAtRef.current = Date.now();
+        return;
+      }
+
+      if (
+        hiddenAtRef.current !== null &&
+        Date.now() - hiddenAtRef.current >= INACTIVITY_LOCK_MS
+      ) {
+        setIsAppLocked(true);
+        setShowAuthGate(false);
+        setShowProfile(false);
+      }
+
+      hiddenAtRef.current = null;
+    }
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [credentialId]);
 
   useEffect(() => {
     if (!activeFeatureId) return;
@@ -156,6 +209,14 @@ function App() {
 
   return (
     <>
+      {isAppLocked ? (
+        <AuthenticationGate
+          title="Unlock App"
+          message="Use your registered WebAuthn credential to unlock the app."
+          allowCancel={false}
+          onAuthSuccess={() => setIsAppLocked(false)}
+        />
+      ) : null}
       <main className="app-layout">
         <FeatureSidebar
           items={[...FEATURE_ITEMS]}

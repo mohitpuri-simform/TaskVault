@@ -4,10 +4,19 @@ import { useWebAuthn } from "../hooks/useWebAuthn";
 
 interface Props {
   onAuthSuccess: () => void;
-  onCancel: () => void;
+  onCancel?: () => void;
+  title?: string;
+  message?: string;
+  allowCancel?: boolean;
 }
 
-export function AuthenticationGate({ onAuthSuccess, onCancel }: Props) {
+export function AuthenticationGate({
+  onAuthSuccess,
+  onCancel,
+  title = "Verify Identity",
+  message = "Use your registered credential (Face ID, fingerprint, or security key) to verify your identity.",
+  allowCancel = true,
+}: Props) {
   const {
     authenticating,
     credentialId,
@@ -39,7 +48,7 @@ export function AuthenticationGate({ onAuthSuccess, onCancel }: Props) {
     <>
       <div
         className="profile-page-overlay"
-        onClick={onCancel}
+        onClick={allowCancel ? onCancel : undefined}
         style={{ zIndex: 1000 }}
       />
       <div
@@ -51,7 +60,7 @@ export function AuthenticationGate({ onAuthSuccess, onCancel }: Props) {
       >
         <div className="profile-page-header">
           <h2 id="auth-gate-title" className="profile-page-title">
-            Verify Identity
+            {title}
           </h2>
         </div>
 
@@ -73,7 +82,7 @@ export function AuthenticationGate({ onAuthSuccess, onCancel }: Props) {
             />
             <div>
               <h3 style={{ marginBottom: "0.5rem" }}>
-                Profile Requires Authentication
+                Authentication Required
               </h3>
               <p
                 style={{
@@ -81,8 +90,7 @@ export function AuthenticationGate({ onAuthSuccess, onCancel }: Props) {
                   marginBottom: "1.5rem",
                 }}
               >
-                Use your registered credential (Face ID, fingerprint, or
-                security key) to verify your identity and access your profile.
+                {message}
               </p>
             </div>
 
@@ -105,19 +113,21 @@ export function AuthenticationGate({ onAuthSuccess, onCancel }: Props) {
                 <ShieldCheck size={15} />
                 {authenticating ? "Verifying…" : "Verify Identity"}
               </button>
-              <button
-                type="button"
-                className="profile-location-btn"
-                onClick={onCancel}
-                style={{
-                  flex: 1,
-                  backgroundColor: "transparent",
-                  border: "1px solid var(--border-color, #ddd)",
-                  color: "var(--text-color, #333)",
-                }}
-              >
-                Cancel
-              </button>
+              {allowCancel ? (
+                <button
+                  type="button"
+                  className="profile-location-btn"
+                  onClick={onCancel}
+                  style={{
+                    flex: 1,
+                    backgroundColor: "transparent",
+                    border: "1px solid var(--border-color, #ddd)",
+                    color: "var(--text-color, #333)",
+                  }}
+                >
+                  Cancel
+                </button>
+              ) : null}
             </div>
           </div>
         </div>

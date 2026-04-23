@@ -39,6 +39,7 @@ export function clearAvatarPhoto() {
 const PROFILE_KEY = "pwa-profile";
 const PASSKEY_CREDENTIAL_ID_KEY = "pwa-passkey-credential-id";
 const PASSKEY_LAST_AUTH_AT_KEY = "pwa-passkey-last-auth-at";
+export const PASSKEY_CREDENTIAL_CHANGE_EVENT = "pwa-passkey-credential-change";
 
 export interface ProfileData {
   name: string;
@@ -64,10 +65,12 @@ export function loadPasskeyCredentialId(): string | null {
 
 export function savePasskeyCredentialId(credentialId: string) {
   localStorage.setItem(PASSKEY_CREDENTIAL_ID_KEY, credentialId);
+  window.dispatchEvent(new Event(PASSKEY_CREDENTIAL_CHANGE_EVENT));
 }
 
 export function clearPasskeyCredentialId() {
   localStorage.removeItem(PASSKEY_CREDENTIAL_ID_KEY);
+  window.dispatchEvent(new Event(PASSKEY_CREDENTIAL_CHANGE_EVENT));
 }
 
 export function loadPasskeyLastAuthAt(): number | null {

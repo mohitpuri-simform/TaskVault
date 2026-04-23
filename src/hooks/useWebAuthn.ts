@@ -82,7 +82,10 @@ export function useWebAuthn(userEmail?: string, userName?: string) {
       }
     }
 
-    window.addEventListener(PASSKEY_CREDENTIAL_CHANGE_EVENT, syncCredentialFromStorage);
+    window.addEventListener(
+      PASSKEY_CREDENTIAL_CHANGE_EVENT,
+      syncCredentialFromStorage,
+    );
     window.addEventListener("storage", onStorage);
 
     return () => {

@@ -14,8 +14,7 @@ export function AuthenticationGate({
   onAuthSuccess,
   onCancel,
   title = "Verify Identity",
-  message =
-    "Use your registered credential (Face ID, fingerprint, or security key) to verify your identity.",
+  message = "Use your registered credential (Face ID, fingerprint, or security key) to verify your identity.",
   allowCancel = true,
 }: Props) {
   const {
@@ -82,7 +81,9 @@ export function AuthenticationGate({
               style={{ color: "var(--primary-color, #20463f)" }}
             />
             <div>
-              <h3 style={{ marginBottom: "0.5rem" }}>Authentication Required</h3>
+              <h3 style={{ marginBottom: "0.5rem" }}>
+                Authentication Required
+              </h3>
               <p
                 style={{
                   color: "var(--text-secondary, #666)",

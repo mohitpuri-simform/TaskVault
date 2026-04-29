@@ -1,12 +1,4 @@
-import {
-  lazy,
-  Suspense,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type FormEvent,
-} from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { useTodoCrud } from "./hooks/useTodoCrud";
 import { useWebAuthn } from "./hooks/useWebAuthn";
 import { InstallPrompt } from "./components/InstallPrompt";
@@ -17,8 +9,8 @@ import { ProfilePage } from "./components/ProfilePage";
 import { TopBar } from "./components/TopBar";
 import { TodoPanel } from "./components/TodoPanel";
 import { useNetworkStatus } from "./hooks/useNetworkStatus";
-import type { Filter } from "./types";
 import { AuthenticationGate } from "./components/AuthenticationGate";
+import { INACTIVITY_LOCK_MS } from "./lib/constants";
 
 const TodoStats = lazy(() =>
   import("./components/TodoStats").then((module) => ({
@@ -48,52 +40,9 @@ function showLocalNotification(message: string) {
   }
 }
 
-const FEATURE_ITEMS = [
-  {
-    id: "install-pwa",
-    name: "Install PWA",
-    description: "Install prompt modal for adding this web app to your device.",
-    targetId: "feature-install",
-  },
-  {
-    id: "network-quality",
-    name: "Adaptive Network Quality",
-    description:
-      "Live Net Good/Avg/Poor quality badge from connection signals.",
-    targetId: "feature-network",
-  },
-  {
-    id: "profile-avatar",
-    name: "Webcam + Capture Profile Photo",
-    description:
-      "Tap avatar to open webcam modal and store captured profile photo.",
-    targetId: "feature-profile",
-  },
-  {
-    id: "offline-sync",
-    name: "Offline-First Sync Queue",
-    description: "Queues CRUD actions offline and syncs back when online.",
-    targetId: "feature-sync",
-  },
-  {
-    id: "todo-stats",
-    name: "Cached Todo Stats",
-    description: "Summary panel backed by local cache and background refetch.",
-    targetId: "feature-stats",
-  },
-  {
-    id: "webcam-pip",
-    name: "Webcam Picture-in-Picture",
-    description: "Start webcam and pop it out into Picture-in-Picture mode.",
-    targetId: "feature-webcam",
-  },
-] as const;
-
 function App() {
-  const INACTIVITY_LOCK_MS = 60_000;
-  const [draft, setDraft] = useState("");
-  const [filter, setFilter] = useState<Filter>("all");
   const [activeFeatureId, setActiveFeatureId] = useState<string | null>(null);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const [showAuthGate, setShowAuthGate] = useState(false);
   const [isAppLocked, setIsAppLocked] = useState(false);
@@ -115,6 +64,7 @@ function App() {
   } = useTodoCrud({ onNotification: showLocalNotification });
 
   function highlightFeature(item: { id: string; targetId: string }) {
+    setIsSidebarOpen(false);
     setActiveFeatureId(null);
     requestAnimationFrame(() => {
       setActiveFeatureId(item.id);
@@ -196,17 +146,6 @@ function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [online]);
 
-  function handleAddTodo(event: FormEvent<HTMLFormElement>) {
-    setDraft("");
-    handleAddTodoFromHook(event);
-  }
-
-  const filteredTodos = useMemo(() => {
-    if (filter === "active") return todos.filter((t) => !t.completed);
-    if (filter === "completed") return todos.filter((t) => t.completed);
-    return todos;
-  }, [filter, todos]);
-
   return (
     <>
       {isAppLocked ? (
@@ -219,12 +158,25 @@ function App() {
       ) : null}
       <main className="app-layout">
         <FeatureSidebar
-          items={[...FEATURE_ITEMS]}
           activeItemId={activeFeatureId}
           onSelect={highlightFeature}
+          isOpen={isSidebarOpen}
+          onClose={() => setIsSidebarOpen(false)}
         />
 
         <section className="app-shell">
+          <button
+            type="button"
+            className="sidebar-toggle-btn"
+            aria-label="Toggle features sidebar"
+            aria-controls="feature-sidebar-panel"
+            aria-expanded={isSidebarOpen}
+            onClick={() => setIsSidebarOpen((prev) => !prev)}
+          >
+            <span className="sidebar-toggle-icon" aria-hidden="true" />
+            <span>Features</span>
+          </button>
+
           <TopBar
             highlighted={activeFeatureId === "network-quality"}
             online={online}
@@ -246,15 +198,11 @@ function App() {
 
           <TodoPanel
             highlighted={activeFeatureId === "offline-sync"}
-            draft={draft}
-            onDraftChange={setDraft}
-            onSubmit={handleAddTodo}
-            filter={filter}
-            onFilterChange={setFilter}
+            onSubmit={handleAddTodoFromHook}
             onSyncNow={() => void syncQueueNow()}
             isLoading={isLoading}
             isError={isError}
-            todos={filteredTodos}
+            todos={todos}
             onToggle={(todo, nextCompleted) => {
               if (nextCompleted && !todo.completed) {
                 showLocalNotification(`Completed: ${todo.title}`);

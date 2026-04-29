@@ -37,6 +37,7 @@ export function clearAvatarPhoto() {
 }
 
 const PROFILE_KEY = "pwa-profile";
+const PROFILE_LOCATION_KEY = "pwa-profile-location";
 const PASSKEY_CREDENTIAL_ID_KEY = "pwa-passkey-credential-id";
 const PASSKEY_LAST_AUTH_AT_KEY = "pwa-passkey-last-auth-at";
 export const PASSKEY_CREDENTIAL_CHANGE_EVENT = "pwa-passkey-credential-change";
@@ -45,6 +46,11 @@ export interface ProfileData {
   name: string;
   bio: string;
   email: string;
+}
+
+export interface ProfileLocationData {
+  lat: number;
+  lng: number;
 }
 
 export function loadProfile(): ProfileData {
@@ -57,6 +63,17 @@ export function loadProfile(): ProfileData {
 
 export function saveProfile(data: ProfileData) {
   localStorage.setItem(PROFILE_KEY, JSON.stringify(data));
+}
+
+export function loadProfileLocation(): ProfileLocationData | null {
+  return safeParse<ProfileLocationData | null>(
+    localStorage.getItem(PROFILE_LOCATION_KEY),
+    null,
+  );
+}
+
+export function saveProfileLocation(data: ProfileLocationData) {
+  localStorage.setItem(PROFILE_LOCATION_KEY, JSON.stringify(data));
 }
 
 export function loadPasskeyCredentialId(): string | null {

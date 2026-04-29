@@ -1,13 +1,9 @@
-import type { FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import type { Filter, Todo } from "../types";
 
 type TodoPanelProps = {
   highlighted: boolean;
-  draft: string;
-  onDraftChange: (value: string) => void;
-  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
-  filter: Filter;
-  onFilterChange: (value: Filter) => void;
+  onSubmit: (title: string) => void;
   onSyncNow: () => void;
   isLoading: boolean;
   isError: boolean;
@@ -19,11 +15,7 @@ type TodoPanelProps = {
 
 export function TodoPanel({
   highlighted,
-  draft,
-  onDraftChange,
   onSubmit,
-  filter,
-  onFilterChange,
   onSyncNow,
   isLoading,
   isError,
@@ -32,18 +24,37 @@ export function TodoPanel({
   onTitleChange,
   onDelete,
 }: TodoPanelProps) {
+  const [draft, setDraft] = useState("");
+  const [filter, setFilter] = useState<Filter>("all");
+
+  const filteredTodos =
+    filter === "active"
+      ? todos.filter((t) => !t.completed)
+      : filter === "completed"
+        ? todos.filter((t) => t.completed)
+        : todos;
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const title = draft.trim();
+    if (!title) return;
+
+    setDraft("");
+    onSubmit(title);
+  }
+
   return (
     <section
       id="feature-sync"
       className={`card ${highlighted ? "feature-highlight" : ""}`}
     >
-      <form onSubmit={onSubmit} className="todo-form">
+      <form onSubmit={handleSubmit} className="todo-form">
         <label htmlFor="todo-title">New task</label>
         <div>
           <input
             id="todo-title"
             value={draft}
-            onChange={(event) => onDraftChange(event.target.value)}
+            onChange={(event) => setDraft(event.target.value)}
             placeholder="Ship offline sync flow"
             maxLength={120}
             required
@@ -60,7 +71,7 @@ export function TodoPanel({
             role="tab"
             aria-selected={filter === value}
             className={filter === value ? "active" : ""}
-            onClick={() => onFilterChange(value)}
+            onClick={() => setFilter(value)}
           >
             {value}
           </button>
@@ -76,7 +87,7 @@ export function TodoPanel({
       ) : null}
 
       <ul className="todo-list">
-        {todos.map((todo) => (
+        {filteredTodos.map((todo) => (
           <li key={todo.id} className={todo.completed ? "done" : ""}>
             <input
               type="checkbox"

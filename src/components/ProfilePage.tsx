@@ -1,76 +1,215 @@
-import { useState } from "react";
-import { Camera, MapPin, Save, X } from "lucide-react";
+import { useMemo, useState } from "react";
+import { CheckCircle2, X } from "lucide-react";
 import {
   loadAvatarPhoto,
+  loadProfileLocation,
   loadProfile,
   saveAvatarPhoto,
+  saveProfileLocation,
   saveProfile,
-  type ProfileData,
 } from "../lib/storage";
 import { WebcamPanel } from "./WebcamPanel";
-import { PasskeyPanel } from "./PasskeyPanel";
+import { AvatarStep } from "./profileWizard/AvatarStep";
+import { BasicInfoStep } from "./profileWizard/BasicInfoStep";
+import { BioLocationStep } from "./profileWizard/BioLocationStep";
+import { PasskeyStep } from "./profileWizard/PasskeyStep";
+import { PROFILE_WIZARD_STEPS } from "./profileWizard/steps";
+import type { PasskeyStatus, ProfileWizardStepId } from "./profileWizard/types";
+import { useProfileWizardDraft } from "../hooks/useProfileWizardDraft";
 
 interface Props {
   onClose: () => void;
 }
 
-type LocationState =
-  | { status: "idle" }
-  | { status: "loading" }
-  | { status: "done"; lat: number; lng: number }
-  | { status: "error"; message: string };
-
 export function ProfilePage({ onClose }: Props) {
-  const [avatar, setAvatar] = useState<string | null>(() => loadAvatarPhoto());
   const [showCameraModal, setShowCameraModal] = useState(false);
-  const [form, setForm] = useState<ProfileData>(() => loadProfile());
-  const [location, setLocation] = useState<LocationState>({ status: "idle" });
   const [saved, setSaved] = useState(false);
+  const [passkeyStatus, setPasskeyStatus] = useState<PasskeyStatus>({
+    credentialId: null,
+    webAuthnSupportReason: null,
+  });
+
+  const initialLocation = useMemo(() => {
+    const profileLocation = loadProfileLocation();
+    if (!profileLocation) {
+      return { status: "idle" } as const;
+    }
+    return {
+      status: "done" as const,
+      lat: profileLocation.lat,
+      lng: profileLocation.lng,
+    };
+  }, []);
+
+  const { draft, hydrated, setDraft, clearDraft } = useProfileWizardDraft({
+    initialStepId: PROFILE_WIZARD_STEPS[0].id,
+    initialAvatar: loadAvatarPhoto(),
+    initialForm: loadProfile(),
+    initialLocation,
+  });
+
+  const activeStepIndex = PROFILE_WIZARD_STEPS.findIndex(
+    (step) => step.id === draft.stepId,
+  );
+  const resolvedStepIndex = activeStepIndex >= 0 ? activeStepIndex : 0;
+  const activeStep = PROFILE_WIZARD_STEPS[resolvedStepIndex];
+  const validationMessage = activeStep.validate({
+    draft,
+    passkey: passkeyStatus,
+  });
+  const canGoNext = validationMessage === null;
+  const isLastStep = resolvedStepIndex === PROFILE_WIZARD_STEPS.length - 1;
 
   function handleCapture(dataUrl: string) {
-    saveAvatarPhoto(dataUrl);
-    setAvatar(dataUrl);
+    setDraft((prev) => ({
+      ...prev,
+      avatar: dataUrl,
+      updatedAt: Date.now(),
+    }));
     setShowCameraModal(false);
-  }
-
-  function handleChange(
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
-  ) {
-    setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
     setSaved(false);
   }
 
-  function handleSave(e: React.FormEvent) {
-    e.preventDefault();
-    saveProfile(form);
+  function handleFormFieldChange(
+    field: "name" | "email" | "bio",
+    value: string,
+  ) {
+    setDraft((prev) => ({
+      ...prev,
+      form: {
+        ...prev.form,
+        [field]: value,
+      },
+      updatedAt: Date.now(),
+    }));
+    setSaved(false);
+  }
+
+  function goToStep(stepId: ProfileWizardStepId) {
+    setDraft((prev) => ({
+      ...prev,
+      stepId,
+      updatedAt: Date.now(),
+    }));
+  }
+
+  function goNext() {
+    if (!canGoNext || isLastStep) {
+      return;
+    }
+    const nextStep = PROFILE_WIZARD_STEPS[resolvedStepIndex + 1];
+    goToStep(nextStep.id);
+  }
+
+  function goBack() {
+    if (resolvedStepIndex === 0) {
+      return;
+    }
+    const previousStep = PROFILE_WIZARD_STEPS[resolvedStepIndex - 1];
+    goToStep(previousStep.id);
+  }
+
+  async function handleFinish() {
+    if (!isLastStep || !canGoNext) {
+      return;
+    }
+
+    saveProfile(draft.form);
+    if (draft.avatar) {
+      saveAvatarPhoto(draft.avatar);
+    }
+    if (draft.location.status === "done") {
+      saveProfileLocation({ lat: draft.location.lat, lng: draft.location.lng });
+    }
+
+    await clearDraft();
     setSaved(true);
   }
 
   function fetchLocation() {
     if (!navigator.geolocation) {
-      setLocation({ status: "error", message: "Geolocation not supported" });
+      setDraft((prev) => ({
+        ...prev,
+        location: { status: "error", message: "Geolocation not supported" },
+        updatedAt: Date.now(),
+      }));
       return;
     }
-    setLocation({ status: "loading" });
+
+    setDraft((prev) => ({
+      ...prev,
+      location: { status: "loading" },
+      updatedAt: Date.now(),
+    }));
+
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        setLocation({
-          status: "done",
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude,
-        });
+        setDraft((prev) => ({
+          ...prev,
+          location: {
+            status: "done",
+            lat: pos.coords.latitude,
+            lng: pos.coords.longitude,
+          },
+          updatedAt: Date.now(),
+        }));
+        setSaved(false);
       },
       (err) => {
-        setLocation({ status: "error", message: err.message });
+        setDraft((prev) => ({
+          ...prev,
+          location: { status: "error", message: err.message },
+          updatedAt: Date.now(),
+        }));
       },
       { timeout: 10000 },
     );
   }
 
-  const addressValue =
-    location.status === "done"
-      ? `${location.lat.toFixed(6)}, ${location.lng.toFixed(6)}`
-      : "";
+  function renderActiveStep() {
+    if (activeStep.id === "avatar") {
+      return (
+        <AvatarStep
+          avatar={draft.avatar}
+          onOpenCamera={() => setShowCameraModal(true)}
+        />
+      );
+    }
+
+    if (activeStep.id === "basic") {
+      return (
+        <BasicInfoStep form={draft.form} onChange={handleFormFieldChange} />
+      );
+    }
+
+    if (activeStep.id === "about-location") {
+      return (
+        <BioLocationStep
+          form={draft.form}
+          location={draft.location}
+          onBioChange={(value) => handleFormFieldChange("bio", value)}
+          onFetchLocation={fetchLocation}
+        />
+      );
+    }
+
+    return (
+      <PasskeyStep
+        userEmail={draft.form.email}
+        userName={draft.form.name}
+        onPasskeyStatusChange={setPasskeyStatus}
+        webAuthnSupportReason={passkeyStatus.webAuthnSupportReason}
+        passkeyAcknowledgedUnsupported={draft.passkeyAcknowledgedUnsupported}
+        onAcknowledgeUnsupported={(checked) => {
+          setDraft((prev) => ({
+            ...prev,
+            passkeyAcknowledgedUnsupported: checked,
+            updatedAt: Date.now(),
+          }));
+        }}
+      />
+    );
+  }
 
   return (
     <>
@@ -81,10 +220,9 @@ export function ProfilePage({ onClose }: Props) {
         aria-modal="true"
         aria-labelledby="profile-page-title"
       >
-        {/* Header */}
         <div className="profile-page-header">
           <h2 id="profile-page-title" className="profile-page-title">
-            My Profile
+            Profile Setup Wizard
           </h2>
           <button
             type="button"
@@ -96,150 +234,84 @@ export function ProfilePage({ onClose }: Props) {
           </button>
         </div>
 
-        {/* Body */}
         <div className="profile-page-body">
-          {/* Avatar section */}
-          <div className="profile-page-avatar-section">
-            <button
-              type="button"
-              className="profile-page-avatar-btn"
-              onClick={() => setShowCameraModal(true)}
-              aria-label="Change profile photo"
-              title="Click to change photo"
-            >
-              {avatar ? (
-                <img
-                  src={avatar}
-                  alt="Profile"
-                  className="profile-avatar-image"
-                />
-              ) : (
-                <div className="profile-avatar-placeholder">
-                  <svg
-                    width="36"
-                    height="36"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                    aria-hidden="true"
-                  >
-                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                    <circle cx="12" cy="7" r="4" />
-                  </svg>
-                </div>
-              )}
-              <div className="profile-page-avatar-badge">
-                <Camera size={14} />
-              </div>
-            </button>
+          <div className="profile-wizard-progress-wrap">
             <p className="profile-page-avatar-hint">
-              Click to update photo via webcam
+              Step {resolvedStepIndex + 1} of {PROFILE_WIZARD_STEPS.length}
             </p>
+            <div className="profile-wizard-progress" aria-hidden="true">
+              {PROFILE_WIZARD_STEPS.map((step, index) => {
+                const isActive = step.id === activeStep.id;
+                const isDone = index < resolvedStepIndex;
+                return (
+                  <span
+                    key={step.id}
+                    className={`profile-wizard-progress-dot${isActive ? " active" : ""}${isDone ? " done" : ""}`}
+                    title={step.title}
+                  />
+                );
+              })}
+            </div>
           </div>
 
-          {/* Form */}
-          <form className="profile-page-form" onSubmit={handleSave} noValidate>
-            {/* Name */}
-            <div className="profile-field">
-              <label htmlFor="profile-name" className="profile-field-label">
-                Full Name
-              </label>
-              <input
-                id="profile-name"
-                name="name"
-                type="text"
-                className="profile-field-input"
-                value={form.name}
-                onChange={handleChange}
-                placeholder="Ada Lovelace"
-                maxLength={80}
-              />
+          <section className="profile-passkey" aria-live="polite">
+            <div className="profile-passkey-head">
+              <h3 className="profile-passkey-title">{activeStep.title}</h3>
+              <span className="profile-field-readonly-badge">Autosaved</span>
             </div>
+            <p className="profile-passkey-copy">{activeStep.description}</p>
 
-            {/* Email */}
-            <div className="profile-field">
-              <label htmlFor="profile-email" className="profile-field-label">
-                Email
-              </label>
-              <input
-                id="profile-email"
-                name="email"
-                type="email"
-                className="profile-field-input"
-                value={form.email}
-                onChange={handleChange}
-                placeholder="ada@example.com"
-                maxLength={120}
-              />
-            </div>
+            {!hydrated ? (
+              <p className="profile-page-avatar-hint">Loading saved draft...</p>
+            ) : null}
 
-            {/* Bio */}
-            <div className="profile-field">
-              <label htmlFor="profile-bio" className="profile-field-label">
-                Bio
-              </label>
-              <textarea
-                id="profile-bio"
-                name="bio"
-                className="profile-field-input profile-field-textarea"
-                value={form.bio}
-                onChange={handleChange}
-                placeholder="A short intro about yourself…"
-                maxLength={300}
-                rows={3}
-              />
-            </div>
+            <div className="profile-page-form">{renderActiveStep()}</div>
 
-            {/* Address (read-only, fetched from Geolocation) */}
-            <div className="profile-field">
-              <label className="profile-field-label">
-                Location&nbsp;
-                <span className="profile-field-readonly-badge">read-only</span>
-              </label>
-              <div className="profile-location-row">
-                <input
-                  type="text"
-                  className="profile-field-input profile-field-readonly"
-                  value={addressValue}
-                  readOnly
-                  placeholder="Hit 'Fetch' to get your coordinates"
-                  aria-label="Location coordinates"
-                />
+            {validationMessage ? (
+              <p className="profile-location-error">{validationMessage}</p>
+            ) : null}
+
+            {saved ? (
+              <p className="profile-passkey-success profile-wizard-saved">
+                <CheckCircle2 size={16} />
+                Profile setup saved successfully.
+              </p>
+            ) : null}
+
+            <div className="profile-wizard-footer">
+              <button
+                type="button"
+                className="profile-location-btn"
+                onClick={goBack}
+                disabled={resolvedStepIndex === 0}
+              >
+                Back
+              </button>
+
+              {!isLastStep ? (
                 <button
                   type="button"
-                  className="profile-location-btn"
-                  onClick={fetchLocation}
-                  disabled={location.status === "loading"}
-                  aria-busy={location.status === "loading"}
+                  className="profile-save-btn"
+                  onClick={goNext}
+                  disabled={!canGoNext}
                 >
-                  <MapPin size={15} />
-                  {location.status === "loading" ? "Fetching…" : "Fetch"}
+                  Next
                 </button>
-              </div>
-              {location.status === "error" && (
-                <p className="profile-location-error">{location.message}</p>
-              )}
-              {location.status === "done" && (
-                <p className="profile-location-note">
-                  Lat {location.lat.toFixed(6)} · Lng {location.lng.toFixed(6)}
-                </p>
+              ) : (
+                <button
+                  type="button"
+                  className="profile-save-btn"
+                  onClick={() => void handleFinish()}
+                  disabled={!canGoNext}
+                >
+                  Finish
+                </button>
               )}
             </div>
-
-            {/* Save */}
-            <button type="submit" className="profile-save-btn">
-              <Save size={16} />
-              {saved ? "Saved!" : "Save Profile"}
-            </button>
-
-            {/* WebAuthn / Passkey Authentication */}
-            <PasskeyPanel userEmail={form.email} userName={form.name} />
-          </form>
+          </section>
         </div>
       </div>
 
-      {/* Camera modal */}
       {showCameraModal && (
         <div
           className="modal-overlay"

@@ -44,6 +44,46 @@ body {
   gap: 1rem;
 }
 
+.sidebar-toggle-btn {
+  display: none;
+  align-items: center;
+  gap: 0.55rem;
+  width: fit-content;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+  color: var(--ink);
+  font-weight: 700;
+  padding: 0.5rem 0.75rem;
+}
+
+.sidebar-toggle-icon {
+  position: relative;
+  width: 14px;
+  height: 2px;
+  background: currentColor;
+  border-radius: 999px;
+}
+
+.sidebar-toggle-icon::before,
+.sidebar-toggle-icon::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  width: 14px;
+  height: 2px;
+  background: currentColor;
+  border-radius: 999px;
+}
+
+.sidebar-toggle-icon::before {
+  top: -5px;
+}
+
+.sidebar-toggle-icon::after {
+  top: 5px;
+}
+
 .feature-sidebar {
   position: sticky;
   top: 1rem;
@@ -52,6 +92,17 @@ body {
   border-radius: 18px;
   box-shadow: 0 10px 20px rgba(32, 70, 63, 0.08);
   padding: 0.9rem;
+}
+
+.feature-sidebar-backdrop {
+  display: none;
+}
+
+.feature-sidebar-close {
+  display: none;
+  margin-left: auto;
+  padding: 0.28rem 0.55rem;
+  font-size: 0.78rem;
 }
 
 .feature-sidebar-head h2 {
@@ -794,13 +845,51 @@ input[type="text"] {
 }
 
 @media (max-width: 700px) {
+  .sidebar-toggle-btn {
+    display: inline-flex;
+  }
+
   .app-layout {
     grid-template-columns: 1fr;
   }
 
+  .feature-sidebar-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.35);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 180ms ease;
+    z-index: 1190;
+  }
+
+  .feature-sidebar-backdrop.open {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
   .feature-sidebar {
-    position: static;
-    order: -1;
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    z-index: 1200;
+    width: min(320px, 86vw);
+    border-radius: 0 16px 16px 0;
+    transform: translateX(-105%);
+    transition: transform 220ms ease;
+    overflow-y: auto;
+  }
+
+  .feature-sidebar.open {
+    transform: translateX(0);
+  }
+
+  .feature-sidebar-close {
+    display: inline-flex;
   }
 
   .profile-banner {
@@ -899,6 +988,34 @@ input[type="text"] {
   padding: 1.5rem;
   display: grid;
   gap: 1.5rem;
+}
+
+.profile-wizard-progress-wrap {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.profile-wizard-progress {
+  display: flex;
+  gap: 0.45rem;
+}
+
+.profile-wizard-progress-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--line) 80%, white);
+  border: 1px solid var(--line);
+}
+
+.profile-wizard-progress-dot.active {
+  background: var(--brand);
+  border-color: var(--brand);
+}
+
+.profile-wizard-progress-dot.done {
+  background: var(--good);
+  border-color: var(--good);
 }
 
 /* Avatar section */
@@ -1152,6 +1269,42 @@ input[type="text"] {
   font-size: 0.82rem;
   color: var(--good);
   font-weight: 600;
+}
+
+.profile-wizard-saved {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.profile-wizard-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.profile-wizard-passkey-step {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.profile-wizard-checkbox {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.45rem;
+  font-size: 0.84rem;
+  color: var(--ink);
+}
+
+.profile-wizard-checkbox input {
+  margin-top: 0.15rem;
+}
+
+.profile-save-btn:disabled,
+.profile-location-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 @media (max-width: 520px) {

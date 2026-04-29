@@ -116,7 +116,7 @@ export function WebcamPanel({
       <div className="webcam-header">
         <h2 className="webcam-title">
           <Camera size={18} aria-hidden="true" />
-          Webcam - your own makeup mirror
+          Webcam
         </h2>
 
         <div className="webcam-controls">

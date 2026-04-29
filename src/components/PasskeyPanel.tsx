@@ -1,12 +1,17 @@
 import { Fingerprint, ShieldCheck } from "lucide-react";
+import { useEffect } from "react";
 import { useWebAuthn } from "../hooks/useWebAuthn";
 
 interface Props {
   userEmail?: string;
   userName?: string;
+  onStatusChange?: (payload: {
+    credentialId: string | null;
+    webAuthnSupportReason: string | null;
+  }) => void;
 }
 
-export function PasskeyPanel({ userEmail, userName }: Props) {
+export function PasskeyPanel({ userEmail, userName, onStatusChange }: Props) {
   const {
     registering,
     authenticating,
@@ -18,6 +23,10 @@ export function PasskeyPanel({ userEmail, userName }: Props) {
     authenticateCredential,
     resetCredential,
   } = useWebAuthn(userEmail, userName);
+
+  useEffect(() => {
+    onStatusChange?.({ credentialId, webAuthnSupportReason });
+  }, [credentialId, onStatusChange, webAuthnSupportReason]);
 
   return (
     <section className="profile-passkey" aria-live="polite">

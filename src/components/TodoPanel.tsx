@@ -3,7 +3,7 @@ import type { Filter, Todo } from "../types";
 
 type TodoPanelProps = {
   highlighted: boolean;
-  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  onSubmit: (title: string) => void;
   onSyncNow: () => void;
   isLoading: boolean;
   isError: boolean;
@@ -35,9 +35,14 @@ export function TodoPanel({
         : todos;
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const title = draft.trim();
+    if (!title) return;
+
     setDraft("");
-    onSubmit(event);
+    onSubmit(title);
   }
+
   return (
     <section
       id="feature-sync"

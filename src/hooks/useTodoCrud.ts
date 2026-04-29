@@ -1,4 +1,3 @@
-import type { FormEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import useTodos, { TODOS_QUERY_KEY } from "./useTodos";
 import useTodoMutations from "./useTodoMutations";
@@ -20,25 +19,19 @@ export function useTodoCrud(options: UseTodoCrudOptions = {}) {
   const { queue, setQueue, enqueue, syncQueueNow, syncing } =
     useQueueSync(online);
 
-  async function handleAddTodo(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = event.currentTarget;
-    const input = form.querySelector<HTMLInputElement>('input[type="text"]');
-    if (!input) return;
-
-    const title = input.value.trim();
-    if (!title) return;
-    input.value = "";
+  async function handleAddTodo(title: string) {
+    const trimmedTitle = title.trim();
+    if (!trimmedTitle) return;
 
     if (online) {
-      addMutation.mutate(title);
+      addMutation.mutate(trimmedTitle);
       return;
     }
 
     // Offline: store optimistically in the query cache and queue for later.
     const optimisticTodo: Todo = {
       id: `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      title,
+      title: trimmedTitle,
       completed: false,
       updatedAt: Date.now(),
       synced: false,
@@ -48,7 +41,7 @@ export function useTodoCrud(options: UseTodoCrudOptions = {}) {
       ...old,
     ]);
     enqueue({ type: "create", todo: optimisticTodo });
-    onNotification?.(`Saved offline: ${title}`);
+    onNotification?.(`Saved offline: ${trimmedTitle}`);
   }
 
   function handlePatchTodo(todo: Todo, changes: Partial<Todo>) {

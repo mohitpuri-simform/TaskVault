@@ -24,7 +24,7 @@ export async function loadProfileWizardDraft(): Promise<ProfileWizardDraft | nul
     return null;
   }
 
-  const { key: _key, ...draft } = raw;
+  const { key: _, ...draft } = raw;
   if (Date.now() - draft.updatedAt > STALE_MS) {
     await clearProfileWizardDraft();
     return null;

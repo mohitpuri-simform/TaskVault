@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Offline page</title>
+    <style>
+      :root {
+        color-scheme: light;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        display: grid;
+        place-items: center;
+        background: radial-gradient(
+          circle at top,
+          #f8f2e4 0%,
+          #efe6d2 40%,
+          #e8dcc3 100%
+        );
+        color: #1f2a2a;
+        padding: 1rem;
+      }
+
+      .card {
+        width: 100%;
+        max-width: 440px;
+        background: #fffdf7;
+        border: 1px solid #d8ceb7;
+        border-radius: 16px;
+        padding: 1.5rem;
+        box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
+      }
+
+      h1 {
+        margin: 0 0 0.5rem;
+        font-size: 1.45rem;
+        line-height: 1.2;
+      }
+
+      p {
+        margin: 0;
+        line-height: 1.5;
+        color: #394849;
+      }
+
+      .actions {
+        margin-top: 1.25rem;
+      }
+
+      button {
+        border: 0;
+        border-radius: 10px;
+        padding: 0.7rem 1rem;
+        font-weight: 600;
+        cursor: pointer;
+        background: #20463f;
+        color: #fff;
+      }
+
+      button:hover {
+        background: #183730;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="card">
+      <h1>You are offline</h1>
+      <p>
+        It looks like your internet connection is unavailable right now. Please
+        reconnect and refresh to continue.
+      </p>
+      <div class="actions">
+        <button id="refreshButton" type="button">Refresh</button>
+      </div>
+    </main>
+
+    <script>
+      const refreshButton = document.getElementById("refreshButton");
+      if (refreshButton) {
+        refreshButton.addEventListener("click", () => {
+          window.location.href = "/index.html";
+        });
+      }
+    </script>
+  </body>
+</html>

@@ -68,7 +68,7 @@ export default defineConfig(({ mode }) => {
           cleanupOutdatedCaches: true,
           clientsClaim: true,
           skipWaiting: true,
-          navigateFallback: "/index.html",
+          navigateFallback: "/offline.html",
           navigateFallbackDenylist: [/^\/api\//],
           navigationPreload: true,
           globPatterns: ["**/*.{js,css,html,ico,png,svg}"],
